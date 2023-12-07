@@ -103,22 +103,33 @@ def main():
     train_dataloader = R2DataLoader(args, tokenizer, split='train', shuffle=True)
     val_dataloader = R2DataLoader(args, tokenizer, split='val', shuffle=False)
     test_dataloader = R2DataLoader(args, tokenizer, split='test', shuffle=False)
-
+    checkpoint = torch.load('data/model_iu_xray.pth')
     # build model architecture
     model = R2GenModel(args, tokenizer)
-
+    
+    model.load_state_dict(checkpoint['state_dict'])
     # get function handles of loss and metrics
     criterion = compute_loss
     metrics = compute_scores
 
     # build optimizer, learning rate scheduler
     optimizer = build_optimizer(args, model)
+    
+    
+    optimizer.load_state_dict(checkpoint['optimizer'])
     lr_scheduler = build_lr_scheduler(args, optimizer)
 
     # build trainer and start to train
+    # print(args.n_gpu)
+    
+    
+    
+
     trainer = Trainer(model, criterion, metrics, optimizer, args, lr_scheduler, train_dataloader, val_dataloader, test_dataloader)
     trainer.train()
+    
 
 
 if __name__ == '__main__':
+    # print(torch.cuda.is_available())
     main()
