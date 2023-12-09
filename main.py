@@ -1,6 +1,7 @@
 import torch
 import argparse
 import numpy as np
+import json
 from modules.tokenizers import Tokenizer
 from modules.dataloaders import R2DataLoader
 from modules.metrics import compute_scores
@@ -118,6 +119,13 @@ def main():
     # build trainer and start to train
     trainer = Trainer(model, criterion, metrics, optimizer, args, lr_scheduler, train_dataloader, val_dataloader, test_dataloader)
     trainer.train()
+
+    # test model
+    result, log = trainer.test()
+    with open('result.json', 'w') as f:
+        json.dump(result, f)
+    with open('log.json', 'w') as f:
+        json.dump(log, f)
 
 
 if __name__ == '__main__':
