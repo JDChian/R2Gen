@@ -120,10 +120,15 @@ def main():
     trainer = Trainer(model, criterion, metrics, optimizer, args, lr_scheduler, train_dataloader, val_dataloader, test_dataloader)
     trainer.train()
 
-    # test model
-    result, log = trainer.test()
+    # predict result
+    result = trainer.predict()
     with open('result.json', 'w') as f:
         json.dump(result, f)
+
+    # evaluate result
+    with open('result.json') as f:
+        data = json.load(f)
+    log = trainer.evaluate(data, 'report')
     with open('log.json', 'w') as f:
         json.dump(log, f)
 

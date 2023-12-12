@@ -288,3 +288,70 @@ class Trainer(BaseTrainer):
             result['test'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(test_gts, test_res)]
 
         return result, log
+
+    def predict(self):
+        result = {'train': [], 'val': [], 'test': []}
+
+        self.model.eval()
+        with torch.no_grad():
+            train_gts, train_res = [], []
+            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
+                images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                    self.device), reports_masks.to(self.device)
+                output = self.model(images, mode='sample')
+                reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                train_res.extend(reports)
+                train_gts.extend(ground_truths)
+            result['train'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(train_gts, train_res)]
+
+        self.model.eval()
+        with torch.no_grad():
+            val_gts, val_res = [], []
+            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.val_dataloader):
+                images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                    self.device), reports_masks.to(self.device)
+                output = self.model(images, mode='sample')
+                reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                val_res.extend(reports)
+                val_gts.extend(ground_truths)
+            result['val'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(val_gts, val_res)]
+
+        self.model.eval()
+        with torch.no_grad():
+            test_gts, test_res = [], []
+            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
+                images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                    self.device), reports_masks.to(self.device)
+                output = self.model(images, mode='sample')
+                reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                test_res.extend(reports)
+                test_gts.extend(ground_truths)
+            result['test'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(test_gts, test_res)]
+
+        return result
+
+    def evaluate(self, result, label):
+        ground_truth_reports = {'train': [], 'val': [], 'test': []}
+        target_reports = {'train': [], 'val': [], 'test': []}
+        for mark in ['train', 'val', 'test']:
+            ground_truth_reports[mark] = [item['ground_truth'] for item in result[mark]]
+            target_reports[mark] = [item[label] for item in result[mark]]
+        
+        log = {}
+
+        train_met = self.metric_ftns({i: [gt] for i, gt in enumerate(ground_truth_reports['train'])}, 
+                                    {i: [re] for i, re in enumerate(target_reports['train'])})
+        log.update(**{'train_' + k: v for k, v in train_met.items()})
+
+        val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(ground_truth_reports['val'])}, 
+                                    {i: [re] for i, re in enumerate(target_reports['val'])})
+        log.update(**{'val_' + k: v for k, v in val_met.items()})
+
+        test_met = self.metric_ftns({i: [gt] for i, gt in enumerate(ground_truth_reports['test'])}, 
+                                    {i: [re] for i, re in enumerate(target_reports['test'])})
+        log.update(**{'test_' + k: v for k, v in test_met.items()})
+
+        return log
