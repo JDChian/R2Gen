@@ -128,9 +128,33 @@ def main():
     # evaluate result
     with open('result.json') as f:
         data = json.load(f)
-    log = trainer.evaluate(data, 'report')
+    log = eval(data, 'report')
     with open('log.json', 'w') as f:
         json.dump(log, f)
+
+
+def eval(result, label):
+    gts = {'train': [], 'val': [], 'test': []}
+    res = {'train': [], 'val': [], 'test': []}
+    for mark in ['train', 'val', 'test']:
+        gts[mark] = [item['ground_truth'] for item in result[mark]]
+        res[mark] = [item[label] for item in result[mark]]
+    
+    log = {}
+
+    train_met = compute_scores({i: [gt] for i, gt in enumerate(gts['train'])}, 
+                               {i: [re] for i, re in enumerate(res['train'])})
+    log.update(**{'train_' + k: v for k, v in train_met.items()})
+
+    val_met = compute_scores({i: [gt] for i, gt in enumerate(gts['val'])}, 
+                             {i: [re] for i, re in enumerate(res['val'])})
+    log.update(**{'val_' + k: v for k, v in val_met.items()})
+
+    test_met = compute_scores({i: [gt] for i, gt in enumerate(gts['test'])}, 
+                              {i: [re] for i, re in enumerate(res['test'])})
+    log.update(**{'test_' + k: v for k, v in test_met.items()})
+
+    return log
 
 
 if __name__ == '__main__':
