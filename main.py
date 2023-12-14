@@ -126,10 +126,8 @@ def main():
         json.dump(result, f)
 
     # evaluate result
-    with open('result.json') as f:
-        data = json.load(f)
-    log = eval(data, 'report')
-    with open('log.json', 'w') as f:
+    score = eval(result, 'report')
+    with open('score.json', 'w') as f:
         json.dump(log, f)
 
 
