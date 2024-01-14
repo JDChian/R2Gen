@@ -1,13 +1,17 @@
 import torch
 import argparse
 import numpy as np
+import os
 from modules.tokenizers import Tokenizer
 from modules.dataloaders import R2DataLoader
 from modules.metrics import compute_scores
 from modules.optimizers import build_optimizer, build_lr_scheduler
 from modules.trainer import Trainer
 from modules.loss import compute_loss
+from modules.utilities import copy_checkpoint, evaluate, store, merge, remove_temporary_folders
+from modules.image_processor import image_preprocessor
 from models.r2gen import R2GenModel
+from models.text_embedding import TextEmbeddingModel
 
 
 def parse_agrs():
@@ -87,8 +91,29 @@ def parse_agrs():
 
 
 def main():
+    
+    # our arguments
+    data_src = 'iu_xray'     # ['iu_xray', 'standardized_iu_xray']
+    whether_to_train = True  # [True, False]
+    api_key = 'empty'        # ['empty', '<your_api_key>']
+
+    # additional arguments
+    whether_to_generate_r2gen_result = True  # [True, False]
+    dataset_type = ['test']                  # ['train', 'val', 'test']
+
     # parse arguments
     args = parse_agrs()
+    args.image_dir = 'data/' + data_src + '/images'
+    args.ann_path = 'data/' + data_src + '/annotation.json'
+    args.dataset_name = data_src
+    args.save_dir = 'results/' + data_src
+    if whether_to_train == False:
+        args.resume = 'output/pth/model_' + data_src + '.pth'
+
+    # preprocess images
+    if data_src == 'standardized_iu_xray':
+        if not os.path.exists('data/standardized_iu_xray'):
+            image_preprocessor()
 
     # fix random seeds
     torch.manual_seed(args.seed)
@@ -103,33 +128,63 @@ def main():
     train_dataloader = R2DataLoader(args, tokenizer, split='train', shuffle=True)
     val_dataloader = R2DataLoader(args, tokenizer, split='val', shuffle=False)
     test_dataloader = R2DataLoader(args, tokenizer, split='test', shuffle=False)
-    checkpoint = torch.load('data/model_iu_xray.pth')
+
     # build model architecture
     model = R2GenModel(args, tokenizer)
-    
-    model.load_state_dict(checkpoint['state_dict'])
+
     # get function handles of loss and metrics
     criterion = compute_loss
     metrics = compute_scores
 
     # build optimizer, learning rate scheduler
     optimizer = build_optimizer(args, model)
-    
-    
-    optimizer.load_state_dict(checkpoint['optimizer'])
     lr_scheduler = build_lr_scheduler(args, optimizer)
 
     # build trainer and start to train
-    # print(args.n_gpu)
-    
-    
-    
-
     trainer = Trainer(model, criterion, metrics, optimizer, args, lr_scheduler, train_dataloader, val_dataloader, test_dataloader)
-    trainer.train()
+    if whether_to_train == True:
+        trainer.train()
+        copy_checkpoint(data_src)
+
+    # generate r2gen model result
+    if whether_to_generate_r2gen_result == True:
+        r2gen_result = trainer.predict(dataset_type)
+        store(r2gen_result, 'output/r2gen_result', data_src + '_result.json')
+
+    # compute r2gen model score
+    if whether_to_generate_r2gen_result == True:
+        r2gen_score = evaluate(r2gen_result, dataset_type)
+        store(r2gen_score, 'output/r2gen_score', data_src + '_score.json')
+
+    # bulid text embedding model
+    if api_key != 'empty':
+        ann_path = 'data/mimic_cxr/annotation.json'
+        data_path = 'output/r2gen_result/' + data_src + '_result.json'
+        record_dir = 'output/record'
+        record_file = data_src + '_record.json'
+        text_embedding_model = TextEmbeddingModel(ann_path, data_path, record_dir, record_file, api_key)
+
+    # generate text embedding model result
+    if api_key != 'empty':
+        text_embedding_result = text_embedding_model.refine(dataset_type)
+        store(text_embedding_result, 'output/text_embedding_result', data_src + '_result.json')
+
+    # compute text embedding model score
+    if api_key != 'empty':
+        text_embedding_score = evaluate(text_embedding_result, dataset_type)
+        store(text_embedding_score, 'output/text_embedding_score', data_src + '_score.json')
+
+    # merge result
+    if api_key != 'empty':
+        r2gen_result_path = 'output/r2gen_result/' + data_src + '_result.json'
+        record_path = 'output/record/' + data_src + '_record.json'
+        union_result_dir_name = 'output/union_result'
+        union_result_file_name = data_src + '_result.txt'
+        merge(r2gen_result_path, record_path, union_result_dir_name, union_result_file_name)
     
+    # remove temporary folders
+    remove_temporary_folders(data_src)
 
 
 if __name__ == '__main__':
-    # print(torch.cuda.is_available())
     main()

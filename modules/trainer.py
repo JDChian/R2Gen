@@ -50,48 +50,47 @@ class BaseTrainer(object):
 
     def train(self):
         not_improved_count = 0
-        # for epoch in range(self.start_epoch, self.epochs + 1):
-        for epoch in range(1):
+        for epoch in range(self.start_epoch, self.epochs + 1):
             result = self._train_epoch(epoch)
 
             # save logged informations into log dict
-        #     log = {'epoch': epoch}
-        #     log.update(result)
-        #     self._record_best(log)
+            log = {'epoch': epoch}
+            log.update(result)
+            self._record_best(log)
 
-        #     # print logged informations to the screen
-        #     for key, value in log.items():
-        #         print('\t{:15s}: {}'.format(str(key), value))
+            # print logged informations to the screen
+            for key, value in log.items():
+                print('\t{:15s}: {}'.format(str(key), value))
 
-        #     # evaluate model performance according to configured metric, save best checkpoint as model_best
-        #     best = False
-        #     if self.mnt_mode != 'off':
-        #         try:
-        #             # check whether model performance improved or not, according to specified metric(mnt_metric)
-        #             improved = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.mnt_best) or \
-        #                        (self.mnt_mode == 'max' and log[self.mnt_metric] >= self.mnt_best)
-        #         except KeyError:
-        #             print("Warning: Metric '{}' is not found. " "Model performance monitoring is disabled.".format(
-        #                 self.mnt_metric))
-        #             self.mnt_mode = 'off'
-        #             improved = False
+            # evaluate model performance according to configured metric, save best checkpoint as model_best
+            best = False
+            if self.mnt_mode != 'off':
+                try:
+                    # check whether model performance improved or not, according to specified metric(mnt_metric)
+                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.mnt_best) or \
+                               (self.mnt_mode == 'max' and log[self.mnt_metric] >= self.mnt_best)
+                except KeyError:
+                    print("Warning: Metric '{}' is not found. " "Model performance monitoring is disabled.".format(
+                        self.mnt_metric))
+                    self.mnt_mode = 'off'
+                    improved = False
 
-        #         if improved:
-        #             self.mnt_best = log[self.mnt_metric]
-        #             not_improved_count = 0
-        #             best = True
-        #         else:
-        #             not_improved_count += 1
+                if improved:
+                    self.mnt_best = log[self.mnt_metric]
+                    not_improved_count = 0
+                    best = True
+                else:
+                    not_improved_count += 1
 
-        #         if not_improved_count > self.early_stop:
-        #             print("Validation performance didn\'t improve for {} epochs. " "Training stops.".format(
-        #                 self.early_stop))
-        #             break
+                if not_improved_count > self.early_stop:
+                    print("Validation performance didn\'t improve for {} epochs. " "Training stops.".format(
+                        self.early_stop))
+                    break
 
-        #     if epoch % self.save_period == 0:
-        #         self._save_checkpoint(epoch, save_best=best)
-        # self._print_best()
-        # self._print_best_to_file()
+            if epoch % self.save_period == 0:
+                self._save_checkpoint(epoch, save_best=best)
+        self._print_best()
+        self._print_best_to_file()
 
     def _print_best_to_file(self):
         crt_time = time.asctime(time.localtime(time.time()))
@@ -189,38 +188,38 @@ class Trainer(BaseTrainer):
     def _train_epoch(self, epoch):
 
         train_loss = 0
-        # self.model.train()
-        # for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
-        #     images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), reports_masks.to(
-        #         self.device)
-        #     output = self.model(images, reports_ids, mode='train')
-        #     loss = self.criterion(output, reports_ids, reports_masks)
-        #     train_loss += loss.item()
-        #     self.optimizer.zero_grad()
-        #     loss.backward()
-        #     torch.nn.utils.clip_grad_value_(self.model.parameters(), 0.1)
-        #     self.optimizer.step()
+        self.model.train()
+        for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
+            images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), reports_masks.to(
+                self.device)
+            output = self.model(images, reports_ids, mode='train')
+            loss = self.criterion(output, reports_ids, reports_masks)
+            train_loss += loss.item()
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_value_(self.model.parameters(), 0.1)
+            self.optimizer.step()
         log = {'train_loss': train_loss / len(self.train_dataloader)}
 
-        # self.model.eval()
-        # with torch.no_grad():
-        #     val_gts, val_res = [], []
-        #     for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.val_dataloader):
-        #         images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
-        #             self.device), reports_masks.to(self.device)
-        #         output = self.model(images, mode='sample')
-        #         reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
-        #         ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
-        #         val_res.extend(reports)
-        #         val_gts.extend(ground_truths)
-        #     val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(val_gts)},
-        #                                {i: [re] for i, re in enumerate(val_res)})
-        #     log.update(**{'val_' + k: v for k, v in val_met.items()})
+        self.model.eval()
+        with torch.no_grad():
+            val_gts, val_res = [], []
+            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.val_dataloader):
+                images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                    self.device), reports_masks.to(self.device)
+                output = self.model(images, mode='sample')
+                reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                val_res.extend(reports)
+                val_gts.extend(ground_truths)
+            val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(val_gts)},
+                                       {i: [re] for i, re in enumerate(val_res)})
+            log.update(**{'val_' + k: v for k, v in val_met.items()})
 
         self.model.eval()
         with torch.no_grad():
             test_gts, test_res = [], []
-            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.val_dataloader): #
+            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
                 images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
                     self.device), reports_masks.to(self.device)
                 output = self.model(images, mode='sample')
@@ -228,16 +227,57 @@ class Trainer(BaseTrainer):
                 ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
                 test_res.extend(reports)
                 test_gts.extend(ground_truths)
-                print(batch_idx)
-                print("images_id", len(images_id))
-                print("ground_truths: ", ground_truths)
-                print("reports: ", reports)
-
             test_met = self.metric_ftns({i: [gt] for i, gt in enumerate(test_gts)},
                                         {i: [re] for i, re in enumerate(test_res)})
             log.update(**{'test_' + k: v for k, v in test_met.items()})
-            print(log)
 
         self.lr_scheduler.step()
 
         return log
+
+    def predict(self, dataset_type):
+        result = {'train': [], 'val': [], 'test': []}
+
+        if 'train' in dataset_type:
+            self.model.eval()
+            with torch.no_grad():
+                train_gts, train_res = [], []
+                for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
+                    images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                        self.device), reports_masks.to(self.device)
+                    output = self.model(images, mode='sample')
+                    reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                    ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                    train_res.extend(reports)
+                    train_gts.extend(ground_truths)
+                result['train'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(train_gts, train_res)]
+
+        if 'val' in dataset_type:
+            self.model.eval()
+            with torch.no_grad():
+                val_gts, val_res = [], []
+                for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.val_dataloader):
+                    images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                        self.device), reports_masks.to(self.device)
+                    output = self.model(images, mode='sample')
+                    reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                    ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                    val_res.extend(reports)
+                    val_gts.extend(ground_truths)
+                result['val'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(val_gts, val_res)]
+
+        if 'test' in dataset_type:
+            self.model.eval()
+            with torch.no_grad():
+                test_gts, test_res = [], []
+                for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
+                    images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+                        self.device), reports_masks.to(self.device)
+                    output = self.model(images, mode='sample')
+                    reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+                    ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+                    test_res.extend(reports)
+                    test_gts.extend(ground_truths)
+                result['test'] = [{'ground_truth': gt, 'report': re} for gt, re in zip(test_gts, test_res)]
+
+        return result
